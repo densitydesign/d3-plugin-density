@@ -139,6 +139,13 @@
         this.__chart__ = {x: x1, y: y1, t: t1, id: id};
       });
     }
+      
+    //option for scale
+    horizon.scale = function(_) {
+        if (!arguments.length) return scale;
+        scale = _ + "";
+        return horizon;
+    }
 
     horizon.bands = function(_) {
       if (!arguments.length) return bands;
