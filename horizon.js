@@ -9,7 +9,9 @@
         width = 960,
         height = 40,
         scale = "global", // or global. added to enable small multiples with global scale.
-        yMaxGlobal = -Infinity; //used if the scale is global.
+        yMaxGlobal = -Infinity, //used if the scale is global.
+        xMinGlobal = Infinity,
+        xMaxGlobal = -Infinity;
 
     var color = d3.scale.linear()
         .domain([-1, 0, 1])
@@ -21,34 +23,39 @@
         console.log("G E':");
         //console.log(g);
         
-        //if the scale is global, compute yMaxGlobal
-        if(scale == "global"){
-            g.each(function(d) {
-                var data = d.map(function(d, i) {
-                   var xv = x.call(this, d, i),
-                       yv = y.call(this, d, i); 
-                if (-yv > yMaxGlobal) {
-                    yMaxGlobal = -yv;
-                }
-                else if (yv > yMaxGlobal) {
-                    yMaxGlobal = yv;
-                }
-            })
-            });
-        }
+        //first, get the total horizontal scale that will be shared among all the charts
+        g.each(function (d) {
+
+                // Compute x- and y-values along with extents.
+                var data = d.map(function (d, i) {
+                    var xv = x.call(this, d, i),
+                        yv = y.call(this, d, i);
+                    if (xv < xMinGlobal) xMinGlobal = xv;
+                    if (xv > xMaxGlobal) xMaxGlobal = xv;
+                    
+                    // if the scale is global, compute yMaxGlobal
+                    if (scale == "global") {
+                        if (-yv > yMaxGlobal) yMaxGlobal = -yv;
+                        if (yv > yMaxGlobal) yMaxGlobal = yv;
+                    } else {
+                        yMax = yMaxGlobal;
+                    }
+                    return [xv, yv];
+                });
+        });
         
         //draw each group
       g.each(function(d) {
         var g = d3.select(this),
-            xMin = Infinity,
-            xMax = -Infinity,
+            xMin = xMinGlobal,
+            xMax = xMaxGlobal,
             yMax = -Infinity,
             x0, // old x-scale
             y0, // old y-scale
             t0,
             id; // unique id for paths
         
-        // Compute x- and y-values along with extents.
+        // If scale is local, compute local yMax
         var data = d.map(function(d, i) {
           var xv = x.call(this, d, i),
               yv = y.call(this, d, i);
