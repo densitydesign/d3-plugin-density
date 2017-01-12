@@ -1,5 +1,5 @@
-(function () {
-    d3.horizon = function () {
+(function() {
+    d3.horizon = function() {
         var bands = 1, // between 1 and 5, typically
             mode = "offset", // or mirror
             area = d3.svg.area(),
@@ -9,9 +9,10 @@
             width = 960,
             height = 40,
             scale = "global", // or global. added to enable small multiples with global scale.
-            yMaxGlobal = -Infinity, //used if the scale is global.
-            xMinGlobal = Infinity,
-            xMaxGlobal = -Infinity;
+            hscale = "global", // or global. added to enable small multiples with global scale.
+            yMaxGlobal = -Infinity, // used if the scale is global.
+            xMinGlobal = Infinity, // used if the horizontal scale is global.
+            xMaxGlobal = -Infinity; // used if the horizontal scale is global.
 
         var color = d3.scale.linear()
             .domain([-1, 0, 1])
@@ -20,44 +21,58 @@
 
         // For each small multiple…
         function horizon(g) {
-            //first, get the total horizontal scale that will be shared among all the charts
-            g.each(function (d) {
 
-                // Compute x- and y-values along with extents.
-                var data = d.map(function (d, i) {
-                    var xv = x.call(this, d, i),
-                        yv = y.call(this, d, i);
-                    if (xv < xMinGlobal) xMinGlobal = xv;
-                    if (xv > xMaxGlobal) xMaxGlobal = xv;
-
-                    // if the scale is global, compute yMaxGlobal
-                    if (scale == "global") {
-                        if (-yv > yMaxGlobal) yMaxGlobal = -yv;
-                        if (yv > yMaxGlobal) yMaxGlobal = yv;
-                    } else {
-                        yMax = yMaxGlobal;
-                    }
-                    return [xv, yv];
+            //if the scale is global, compute yMaxGlobal
+            if (scale == "global") {
+                g.each(function(d) {
+                    var data = d.map(function(d, i) {
+                        var xv = x.call(this, d, i),
+                            yv = y.call(this, d, i);
+                        if (-yv > yMaxGlobal) {
+                            yMaxGlobal = -yv;
+                        } else if (yv > yMaxGlobal) {
+                            yMaxGlobal = yv;
+                        }
+                    })
                 });
-            });
+            }
+
+            //
+            if (hscale == 'global') {
+                g.each(function(d) {
+                    var data = d.map(function(d, i) {
+                        var xv = x.call(this, d, i);
+                        if (xv < xMinGlobal) xMinGlobal = xv;
+                        if (xv > xMaxGlobal) xMaxGlobal = xv;
+                    })
+                });
+            }
+
 
             //draw each group
-            g.each(function (d) {
+            g.each(function(d) {
                 var g = d3.select(this),
-                    xMin = xMinGlobal,
-                    xMax = xMaxGlobal,
+                    xMin = Infinity,
+                    xMax = -Infinity,
                     yMax = -Infinity,
                     x0, // old x-scale
                     y0, // old y-scale
                     t0,
                     id; // unique id for paths
 
-                // If scale is local, compute local yMax
-                var data = d.map(function (d, i) {
+                // Compute x- and y-values along with extents.
+                var data = d.map(function(d, i) {
                     var xv = x.call(this, d, i),
                         yv = y.call(this, d, i);
-                    if (xv < xMin) xMin = xv;
-                    if (xv > xMax) xMax = xv;
+
+                    if (hscale == 'local') {
+                        if (xv < xMin) xMin = xv;
+                        if (xv > xMax) xMax = xv;
+                    } else {
+                        xMin = xMinGlobal;
+                        xMax = xMaxGlobal;
+                    }
+
                     if (scale == "local") {
                         if (-yv > yMax) yMax = -yv;
                         if (yv > yMax) yMax = yv;
@@ -110,27 +125,22 @@
                 var path = g.select("g").selectAll("path")
                     .data(d3.range(-1, -bands - 1, -1).concat(d3.range(1, bands + 1)), Number);
 
-                if (defined) area.defined(function (_, i) {
-                    return defined.call(this, d[i], i);
-                });
+                if (defined) area.defined(function(_, i) {
+                    return defined.call(this, d[i], i); });
 
                 var d0 = area
-                    .x(function (d) {
-                        return x0(d[0]);
-                    })
+                    .x(function(d) {
+                        return x0(d[0]); })
                     .y0(height * bands)
-                    .y1(function (d) {
-                        return height * bands - y0(d[1]);
-                    })
+                    .y1(function(d) {
+                        return height * bands - y0(d[1]); })
                     (data);
 
                 var d1 = area
-                    .x(function (d) {
-                        return x1(d[0]);
-                    })
-                    .y1(function (d) {
-                        return height * bands - y1(d[1]);
-                    })
+                    .x(function(d) {
+                        return x1(d[0]); })
+                    .y1(function(d) {
+                        return height * bands - y1(d[1]); })
                     (data);
 
                 path.enter().append("path")
@@ -149,66 +159,61 @@
                     .remove();
 
                 // Stash the new scales.
-                this.__chart__ = {
-                    x: x1,
-                    y: y1,
-                    t: t1,
-                    id: id
-                };
+                this.__chart__ = { x: x1, y: y1, t: t1, id: id };
             });
         }
 
         //option for scale
-        horizon.scale = function (_) {
+        horizon.scale = function(_) {
             if (!arguments.length) return scale;
             scale = _ + "";
             return horizon;
         }
 
-        horizon.bands = function (_) {
+        horizon.bands = function(_) {
             if (!arguments.length) return bands;
             bands = +_;
             color.domain([-bands, 0, bands]);
             return horizon;
         };
 
-        horizon.mode = function (_) {
+        horizon.mode = function(_) {
             if (!arguments.length) return mode;
             mode = _ + "";
             return horizon;
         };
 
-        horizon.colors = function (_) {
+        horizon.colors = function(_) {
             if (!arguments.length) return color.range();
             color.range(_);
             return horizon;
         };
 
-        horizon.x = function (_) {
+        horizon.x = function(_) {
             if (!arguments.length) return x;
             x = _;
             return horizon;
         };
 
-        horizon.y = function (_) {
+        horizon.y = function(_) {
             if (!arguments.length) return y;
             y = _;
             return horizon;
         };
 
-        horizon.width = function (_) {
+        horizon.width = function(_) {
             if (!arguments.length) return width;
             width = +_;
             return horizon;
         };
 
-        horizon.height = function (_) {
+        horizon.height = function(_) {
             if (!arguments.length) return height;
             height = +_;
             return horizon;
         };
 
-        horizon.defined = function (_) {
+        horizon.defined = function(_) {
             if (!arguments.length) return defined;
             defined = _;
             return horizon;
@@ -220,18 +225,14 @@
     var d3_horizonId = 0;
 
     function d3_horizonX(d) {
-        return d[0];
-    }
+        return d[0]; }
 
     function d3_horizonY(d) {
-        return d[1];
-    }
+        return d[1]; }
 
     function d3_horizonTransform(bands, h, mode) {
-        return mode == "offset" ? function (d) {
-            return "translate(0," + (d + (d < 0) - bands) * h + ")";
-        } : function (d) {
-            return (d < 0 ? "scale(1,-1)" : "") + "translate(0," + (d - bands) * h + ")";
-        };
+        return mode == "offset" ? function(d) {
+            return "translate(0," + (d + (d < 0) - bands) * h + ")"; } : function(d) {
+            return (d < 0 ? "scale(1,-1)" : "") + "translate(0," + (d - bands) * h + ")"; };
     }
 })();
